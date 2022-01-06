@@ -1,0 +1,184 @@
+---
+title: "Analisis de imagenes Satelitales "
+author: "Analisis de cobertura - Sentinel 2"
+date: "06/01/2022"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    logo: RGE.png
+    social: [ "twitter", "facebook", "whatsapp", "instagram", "telegram", "linkedin", "pinterest" ]
+    source_code: "https://github.com/GorkyFlorez"
+    theme: flatly
+    # "default", "cerulean", "journal", "flatly", "darkly", "readable", "spacelab", "united", "cosmo", "lumen", "paper", "sandstone", "simplex", "yeti"
+---
+
+```{r setup, include=FALSE}
+#-----------------------------------Mapa-----------------------------
+library(rgee)
+library(googledrive)
+library(rgee)
+library(mapedit)
+library(tibble)
+library(sf)
+library(cptcity)
+library(tidyverse)
+library(sp)
+library(leaflet.extras2)
+library(raster)
+library(stars)
+library(geojsonio)
+ee_Initialize("gflorezc", drive = T)
+#-----------------------------------Mapa-----------------------------
+Poligon <-ee$FeatureCollection("users/gflorezc/huepetuhe")
+
+#-----------------------------------Sentinel 2 2021---------------------------
+sentinel2 <- ee$ImageCollection("COPERNICUS/S2")
+Trueimage <-sentinel2$filterBounds(Poligon)$ 
+  filterDate("2020-01-01", "2021-12-12")$ 
+  sort("CLOUDY_PIXEL_PERCENTAGE", FALSE)$
+  mosaic()$
+  clip(Poligon)
+
+trueColor <- list(min= 0,max= 3000, bands= c("B11","B8", "B2"))
+truerojo  <- list(min= 0,max= 3000, bands= c("B8","B4", "B3"))
+trueCol   <- list(min= 0,max= 3000, bands= c("B4","B3", "B2"))
+NDVI      <- Trueimage$normalizedDifference(c("B8", "B4"))
+
+# Conjunto de datos de entrenamiento
+trainig <- Trueimage$sample(region = Poligon,
+                            scale= 5,
+                            numPixels =1000)
+clusterer <- ee$Clusterer$wekaKMeans(3)$train(trainig)
+result <- Trueimage$cluster(clusterer)
+
+L8 <- ee$Image('LANDSAT/LC08/C01/T1_TOA/LC08_003069_20141013')$
+  clip(Poligon)%>% 
+  ee$Image$select(c("B6","B5", "B4"))
+
+LAN_NDVI      <- L8$normalizedDifference(c("B5", "B4"))
+
+L88 <- ee$Image('LANDSAT/LC08/C01/T1_TOA/LC08_003069_20141013')$
+  clip(Poligon)
+
+# Conjunto de datos de entrenamiento
+trainig1 <- L88 $sample(region = Poligon,
+                            scale= 5,
+                            numPixels =1000)
+clusterer1 <- ee$Clusterer$wekaKMeans(3)$train(trainig1)
+result1 <- L88 $cluster(clusterer1)
+
+```
+Google Earth Engine en RStudio
+===================================== 
+
+Column {data-width=100}
+-----------------------------------------------------------------------
+
+### Librerias 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://user-images.githubusercontent.com/16768318/118376965-5f7dca80-b5cb-11eb-9a82-47876680a3e6.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://cdn.conceptosclaros.com/wp-content/uploads/2016/07/RStudio-Ball.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://www.osgeo.org/wp-content/uploads/leaflet.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://user-images.githubusercontent.com/16768318/118376968-63a9e800-b5cb-11eb-83e7-3f36299e17cb.png")
+```
+
+Column {data-width=850}
+-----------------------------------------------------------------------
+### Mapa de imagen satelital Sentinel-2  
+```{r}
+Map$centerObject(Poligon)   
+Map$addLayer(Trueimage, visParams = trueColor,
+             name= "Analisis de Agricultura")
+```
+
+
+Usos agrícolas en el distrito de Huepetuhe
+===================================== 
+
+Column {data-width=100}
+-----------------------------------------------------------------------
+
+### Librerias 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://user-images.githubusercontent.com/16768318/118376965-5f7dca80-b5cb-11eb-9a82-47876680a3e6.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://cdn.conceptosclaros.com/wp-content/uploads/2016/07/RStudio-Ball.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://www.osgeo.org/wp-content/uploads/leaflet.png")
+```
+
+### 
+```{r, out.width="50%"}
+# this is the original gif
+knitr::include_graphics("https://user-images.githubusercontent.com/16768318/118376968-63a9e800-b5cb-11eb-83e7-3f36299e17cb.png")
+```
+
+Column {data-width=900}
+-----------------------------------------------------------------------
+```{r}
+Map$centerObject(Poligon) 
+Map$addLayer(L8,
+             name= "Analisis de Agricultura-2014")|
+  Map$addLayer(Trueimage, visParams = trueColor,
+             name= "Analisis de Agricultura-2021") 
+```
+
+Índice de Vegetación de Diferencia Normalizada (NDVI) en el distrito de Huepetuhe
+===================================== 
+
+Column {data-width=900}
+-----------------------------------------------------------------------
+```{r}
+Map$centerObject(Poligon) 
+Map$addLayer(eeObject =LAN_NDVI, name= "NDVI-2014",visParams = list(
+    min=0.2,
+    max=0.8,
+    palette= cpt("grass_ndvi", 10))) |
+  Map$addLayer(eeObject =NDVI, visParams = list(
+    min=0.2,
+    max=0.8,
+    palette= cpt("grass_ndvi", 10)),
+    name= "(NDVI)-2021")+
+    Map$addLegend(list(min = 0.2, max = 0.8, palette= c("#051852", "#FFFFFF" ,"#C7B59B", "#A8B255" ,"#A3C020",
+                                                      "#76AD00" ,"#429001" ,"#006400" ,"#003B00" ,"#000000")), 
+                name = "NDVI", position = "bottomright", bins = 10)
+```
+
+Usos agrícolas en el distrito de Huepetuhe
+===================================== 
+
+Column {data-width=900}
+-----------------------------------------------------------------------
+```{r}
+Map$centerObject(Poligon)  
+Map$addLayer(eeObject = result1$randomVisualizer(),
+               name= "Clasificacion no Supervisada-2015")|
+  Map$addLayer(eeObject = result$randomVisualizer(),
+               name= "Clasificacion no Supervisada-2021")
+```
+
